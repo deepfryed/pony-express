@@ -19,7 +19,7 @@ USAGE:
   >> args = { from: "jim@example.com", to: "ralph@example.com", subject: "test email", via: "sendmail" }
   >> args[:text] = "Hello!"
   >> args[:html] = "<strong>Hello!</strong>"
-  >> PonyExpress.send(args)
+  >> PonyExpress.mail(args)
 
 
 TODO:

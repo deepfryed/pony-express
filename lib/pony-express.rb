@@ -11,7 +11,7 @@ module PonyExpress
     Mimetic.build(options)
   end
 
-  def self.send options
+  def self.mail options
     via = options.delete(:via) || 'sendmail'
     via_options = options.delete(:via_options) || {}
 
