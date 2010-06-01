@@ -20,6 +20,7 @@ using namespace mimetic;
 
 VALUE rb_mimetic_build(VALUE self, VALUE options) {
     ostringstream output;
+    int message_id = 1;
 
     VALUE text    = rb_hash_aref(options, ID2SYM(rb_intern("text")));
     VALUE html    = rb_hash_aref(options, ID2SYM(rb_intern("html")));
@@ -36,6 +37,7 @@ VALUE rb_mimetic_build(VALUE self, VALUE options) {
     MimeEntity *message   = NULL;
     MimeEntity *html_part = NULL;
     MimeEntity *text_part = NULL;
+    MimeVersion v1("1.0");
 
     try {
         message = new MimeEntity;
@@ -46,14 +48,23 @@ VALUE rb_mimetic_build(VALUE self, VALUE options) {
             text_part = new MimeEntity;
             message->body().parts().push_back(text_part);
             message->body().parts().push_back(html_part);
-            text_part->header().contentType("text/plain; charset=utf-8");
+            text_part->header().contentType("text/plain; charset=UTF-8");
+            text_part->header().contentTransferEncoding("8bit");
+            text_part->header().messageid(message_id++);
+            text_part->header().mimeVersion(v1);
             text_part->body().assign(RSTRING_PTR(text));
-            html_part->header().contentType("text/html; charset=utf-8");
+            html_part->header().contentType("text/html; charset=UTF-8");
+            html_part->header().contentTransferEncoding("7bit");
+            html_part->header().messageid(message_id++);
+            html_part->header().mimeVersion(v1);
             html_part->body().assign(RSTRING_PTR(html));
         }
         else {
             message->body().assign(RSTRING_PTR(text));
-            message->header().contentType("text/plain; charset=utf-8");
+            message->header().contentType("text/plain; charset=UTF-8");
+            message->header().contentTransferEncoding("8bit");
+            message->header().messageid(message_id++);
+            message->header().mimeVersion(v1);
         }
         
         message->header().from(RSTRING_PTR(from));
