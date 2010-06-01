@@ -14,7 +14,7 @@ rescue LoadError
 end
 
 Jeweler::Tasks.new do |gem|
-  gem.name        = 'fastcaptcha'
+  gem.name        = 'pony-express'
   gem.summary     = 'A fast and lightweight mailer'
   gem.description = 'A fast and lightweight mailer for ruby that uses libmimetic for generating mails'
   gem.email       = 'deepfryed@gmail.com'
