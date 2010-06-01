@@ -23,7 +23,7 @@ Jeweler::Tasks.new do |gem|
  
   gem.files = FileList[
     'lib/**/*.rb',
-    'ext/*.{h,c}',
+    'ext/*.{h,c,cxx}',
     'VERSION',
     'README'
   ]
