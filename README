@@ -18,7 +18,7 @@ USAGE:
 
   >> require "pony-express"
   >> mail = PonyExpress::Mail.new to: "burns@plant.local", from: "homer@home.local", via: "sendmail"
-  >> mail.add subject: "Hello Mr.Burns", text: "Can I have more donuts", html: "<strong>More Dooooonuuuuts!</strong>"
+  >> mail.add subject: "Hello Mr.Burns", text: "Can I have more donuts ?", html: "<strong>More Dooooonuuuuts!</strong>"
   >> mail.add attachments: [ "/home/homer/donuts.png" ]
   >> mail.dispatch
 
@@ -28,7 +28,7 @@ USAGE:
 
 TODO:
 
-  * Check for Memory Leaks, build a Rainbow machine and rope in some Unicorns.
+  * Build a rainbow machine and rope in some unicorns.
 
 DON'T ASK:
 

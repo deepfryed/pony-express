@@ -31,15 +31,21 @@ http://www.ietf.org/rfc/rfc2392.txt  Content-ID and Message-ID.
 
 */
 
-// TODO: CHECK FOR MEMORY LEAKS - not sure if mimetic releases mime parts.
+string file_mime_type(string file) {
+    Pcre regex("\\.");
+    string extn = regex.split(file).back();
+    transform(extn.begin(), extn.end(), extn.begin(), ::tolower);
+    string mime = MimeTypes[extn];
+    return mime.length() > 0 ? mime : "application/octet-stream";
+}
 
-bool mimetic_attach_file(MimeEntity *m, char* filename, const char *mimetype) {
+bool mimetic_attach_file(MimeEntity *m, char* filename) {
     filebuf ifile;
     ostringstream encoded;
     ifile.open(filename, ios::in);
     if (ifile.is_open()) {
         istream is(&ifile);
-        Attachment *at = new Attachment(filename, ContentType(mimetype));
+        Attachment *at = new Attachment(filename, ContentType(file_mime_type(filename)));
         Base64::Encoder b64;
         ostreambuf_iterator<char> oi(encoded);
         istreambuf_iterator<char> ibegin(is), iend;
@@ -53,14 +59,6 @@ bool mimetic_attach_file(MimeEntity *m, char* filename, const char *mimetype) {
         rb_raise(eRuntimeError, "Mimetic: Unable to read attachment file %s", filename);
     }
     return false;
-}
-
-string get_mime_type(string file) {
-    Pcre regex("\\.");
-    string extn = regex.split(file).back();
-    transform(extn.begin(), extn.end(), extn.begin(), ::tolower);
-    string mime = MimeTypes[extn];
-    return mime.length() > 0 ? mime : MimeTypes["bin"];
 }
 
 void rb_load_mime_types(VALUE self, VALUE filename) {
@@ -148,7 +146,7 @@ VALUE rb_mimetic_build(VALUE self, VALUE options) {
             for (long i = 0; i < RARRAY_LEN(files); i++) {
                 attachment = rb_ary_entry(files, i);
                 if (attachment != Qnil && TYPE(attachment) == T_STRING)
-                    mimetic_attach_file(message, RSTRING_PTR(attachment), get_mime_type(RSTRING_PTR(attachment)).c_str());
+                    mimetic_attach_file(message, RSTRING_PTR(attachment));
             }
         }
 
