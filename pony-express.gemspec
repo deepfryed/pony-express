@@ -5,7 +5,7 @@
 
 Gem::Specification.new do |s|
   s.name = %q{pony-express}
-  s.version = "0.6.0"
+  s.version = "0.6.1"
 
   s.required_rubygems_version = Gem::Requirement.new(">= 0") if s.respond_to? :required_rubygems_version=
   s.authors = ["Bharanee Rathna"]
@@ -18,10 +18,12 @@ Gem::Specification.new do |s|
      "README"
   ]
   s.files = [
-    "README",
+    "LICENSE",
+     "README",
      "VERSION",
      "ext/mimetic.cxx",
-     "lib/pony-express.rb"
+     "lib/pony-express.rb",
+     "mime.types"
   ]
   s.homepage = %q{http://github.com/deepfryed/pony-express}
   s.rdoc_options = ["--charset=UTF-8"]

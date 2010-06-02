@@ -22,10 +22,12 @@ Jeweler::Tasks.new do |gem|
   gem.authors     = ['Bharanee Rathna']
  
   gem.files = FileList[
+    'mime.types',
     'lib/**/*.rb',
     'ext/*.{h,c,cxx}',
     'VERSION',
-    'README'
+    'README',
+    'LICENSE'
   ]
   gem.extensions  = FileList[ 'ext/**/extconf.rb' ]
   gem.test_files  = FileList[ 'test/**/*_test.rb' ]
