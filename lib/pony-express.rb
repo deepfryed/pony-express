@@ -8,12 +8,12 @@ module PonyExpress
 
   Mimetic.load_mime_types File.dirname(__FILE__) + "/../mime.types"
 
-  def self.build options
+  def build options
     # TODO validation.
     Mimetic.build(options)
   end
 
-  def self.mail options
+  def mail options
     via = (options.delete(:via) || :smtp).to_sym
     via_options = options.delete(:via_options) || {}
 
@@ -27,14 +27,12 @@ module PonyExpress
     end
   end
 
-  private
-
-  def self.sendmail_binary
+  def sendmail_binary
     sendmail = `which sendmail`.chomp
     sendmail.empty? ? '/usr/sbin/sendmail' : sendmail
   end
 
-  def self.transport_via_sendmail content, options={}
+  def transport_via_sendmail content, options={}
     IO.popen('-', 'w+') do |pipe|
       if pipe
         pipe.write(content)
@@ -44,7 +42,7 @@ module PonyExpress
     end
   end
 
-  def self.transport_via_smtp content, from, to, options={}
+  def transport_via_smtp content, from, to, options={}
     o = DEFAULT_SMTP_OPTIONS.merge(options)
     smtp = Net::SMTP.new(o[:host], o[:port])
     if o[:tls]
@@ -60,4 +58,31 @@ module PonyExpress
     smtp.finish
   end
 
+  class Mail
+    include PonyExpress
+    attr_accessor :options
+
+    def initialize opt={}
+      @options = opt
+    end
+
+    def add opt
+      @options.merge! opt
+    end
+
+    def remove opt
+      keys = opt.keys
+      @options.reject! {|k, v| keys.include?(k) }
+    end
+
+    def dispatch
+      mail(@options)
+    end
+
+    def content
+      build(@options)
+    end
+  end
+
+  extend self
 end
