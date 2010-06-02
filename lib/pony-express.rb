@@ -14,11 +14,10 @@ module PonyExpress
   end
 
   def self.mail options
-    via = options.delete(:via) || 'sendmail'
+    via = (options.delete(:via) || :smtp).to_sym
     via_options = options.delete(:via_options) || {}
 
-    via = options.delete(:via) || :smtp
-    if TRANSPORTS.include? via.to_sym
+    if TRANSPORTS.include? via
       case via
       when :sendmail then transport_via_sendmail build(options), via_options
       when :smtp     then transport_via_smtp build(options), options[:from], options[:to], via_options
