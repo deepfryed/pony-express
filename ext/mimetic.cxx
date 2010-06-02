@@ -4,6 +4,8 @@
 #include <unistd.h>
 #include <sstream>
 #include <exception>
+#include <algorithm>
+#include <pcre++.h>
 #include <mimetic/mimetic.h>
 
 #define ID_CONST_GET rb_intern("const_get")
@@ -15,15 +17,75 @@ static VALUE eArgumentError;
 
 using namespace std;
 using namespace mimetic;
+using namespace pcrepp;
 
 #define VALUEFUNC(f) ((VALUE (*)(ANYARGS)) f)
 
+map<string, string> MimeTypes;
+
+/* RFC References
+
+http://www.ietf.org/rfc/rfc2822.txt  Internet Message Format.
+http://www.ietf.org/rfc/rfc1341.txt  MIME Extensions - Multipart related.
+http://www.ietf.org/rfc/rfc2392.txt  Content-ID and Message-ID.
+
+*/
+
+// TODO: CHECK FOR MEMORY LEAKS - not sure if mimetic releases mime parts.
+
+bool mimetic_attach_file(MimeEntity *m, char* filename, const char *mimetype) {
+    filebuf ifile;
+    ostringstream encoded;
+    ifile.open(filename, ios::in);
+    if (ifile.is_open()) {
+        istream is(&ifile);
+        Attachment *at = new Attachment(filename, ContentType(mimetype));
+        Base64::Encoder b64;
+        ostreambuf_iterator<char> oi(encoded);
+        istreambuf_iterator<char> ibegin(is), iend;
+        encode(ibegin, iend, b64, oi);
+        at->body().assign(encoded.str());
+        m->body().parts().push_back(at);
+        ifile.close();
+        return true;
+    }
+    else {
+        rb_raise(eRuntimeError, "Mimetic: Unable to read attachment file %s", filename);
+    }
+    return false;
+}
+
+string get_mime_type(string file) {
+    Pcre regex("\\.");
+    string extn = regex.split(file).back();
+    transform(extn.begin(), extn.end(), extn.begin(), ::tolower);
+    string mime = MimeTypes[extn];
+    return mime.length() > 0 ? mime : MimeTypes["bin"];
+}
+
+void rb_load_mime_types(VALUE self, VALUE filename) {
+    char buffer[4096];
+    vector<string> data;
+    Pcre regex("[\\r\\n\\t]+");
+    ifstream file(RSTRING_PTR(filename), ios::in);
+    if (file.is_open()) {
+        while (!file.eof()) {
+            file.getline(buffer, 4096);
+            data = regex.split(buffer);
+            for (int i = 1; i < data.size(); i++)
+                MimeTypes[data[i]] = data[0];
+        }
+        file.close();
+    }
+    else {
+        rb_raise(eRuntimeError, "Mimetic: Unable to load mime.types");
+    }
+}
+
 VALUE rb_mimetic_build(VALUE self, VALUE options) {
     ostringstream output;
-    int message_id = 1;
-
+    VALUE attachment;
     VALUE text    = rb_hash_aref(options, ID2SYM(rb_intern("text")));
-    VALUE html    = rb_hash_aref(options, ID2SYM(rb_intern("html")));
     VALUE to      = rb_hash_aref(options, ID2SYM(rb_intern("to")));
     VALUE from    = rb_hash_aref(options, ID2SYM(rb_intern("from")));
     VALUE subject = rb_hash_aref(options, ID2SYM(rb_intern("subject")));
@@ -32,6 +94,18 @@ VALUE rb_mimetic_build(VALUE self, VALUE options) {
     if (from    == Qnil) rb_raise(eArgumentError, "Mimetic.build called without :from");
     if (to      == Qnil) rb_raise(eArgumentError, "Mimetic.build called without :to");
     if (subject == Qnil) rb_raise(eArgumentError, "Mimetic.build called without :subject");
+
+    // optional fields
+    VALUE html    = rb_hash_aref(options, ID2SYM(rb_intern("html")));
+    VALUE tcid    = rb_hash_aref(options, ID2SYM(rb_intern("text_content_id")));
+    VALUE hcid    = rb_hash_aref(options, ID2SYM(rb_intern("html_content_id")));
+    VALUE replyto = rb_hash_aref(options, ID2SYM(rb_intern("replyto")));
+    VALUE cc      = rb_hash_aref(options, ID2SYM(rb_intern("cc")));
+    VALUE bcc     = rb_hash_aref(options, ID2SYM(rb_intern("bcc")));
+    VALUE files   = rb_hash_aref(options, ID2SYM(rb_intern("attachments")));
+
+    if (files != Qnil && TYPE(files) != T_ARRAY)
+        rb_raise(eArgumentError, "Mimetic.build expects :attachments to be an array");
 
     VALUE errors  = Qnil;
     MimeEntity *message   = NULL;
@@ -50,12 +124,12 @@ VALUE rb_mimetic_build(VALUE self, VALUE options) {
             message->body().parts().push_back(html_part);
             text_part->header().contentType("text/plain; charset=UTF-8");
             text_part->header().contentTransferEncoding("8bit");
-            text_part->header().messageid(message_id++);
+            text_part->header().contentId(tcid == Qnil ? ContentId() : ContentId(RSTRING_PTR(tcid)));
             text_part->header().mimeVersion(v1);
             text_part->body().assign(RSTRING_PTR(text));
             html_part->header().contentType("text/html; charset=UTF-8");
             html_part->header().contentTransferEncoding("7bit");
-            html_part->header().messageid(message_id++);
+            html_part->header().contentId(hcid == Qnil ? ContentId() : ContentId(RSTRING_PTR(hcid)));
             html_part->header().mimeVersion(v1);
             html_part->body().assign(RSTRING_PTR(html));
         }
@@ -63,14 +137,30 @@ VALUE rb_mimetic_build(VALUE self, VALUE options) {
             message->body().assign(RSTRING_PTR(text));
             message->header().contentType("text/plain; charset=UTF-8");
             message->header().contentTransferEncoding("8bit");
-            message->header().messageid(message_id++);
             message->header().mimeVersion(v1);
         }
-        
+
+        if (files != Qnil && RARRAY_LEN(files) > 0) {
+            MimeEntity *m = message;
+            message = new MultipartMixed();
+            message->header().mimeVersion(v1);
+            message->body().parts().push_back(m);
+            for (long i = 0; i < RARRAY_LEN(files); i++) {
+                attachment = rb_ary_entry(files, i);
+                if (attachment != Qnil && TYPE(attachment) == T_STRING)
+                    mimetic_attach_file(message, RSTRING_PTR(attachment), get_mime_type(RSTRING_PTR(attachment)).c_str());
+            }
+        }
+
         message->header().from(RSTRING_PTR(from));
         message->header().to(RSTRING_PTR(to));
         message->header().subject(RSTRING_PTR(subject));
-    
+        message->header().messageid(1);
+
+        if (replyto != Qnil) message->header().replyto(RSTRING_PTR(replyto));
+        if (cc      != Qnil) message->header().cc(RSTRING_PTR(cc));
+        if (bcc     != Qnil) message->header().bcc(RSTRING_PTR(bcc));
+
         output << *message << endl;
         delete message;
         return rb_str_new2(output.str().c_str());
@@ -86,13 +176,13 @@ VALUE rb_mimetic_build(VALUE self, VALUE options) {
 
     rb_raise(eRuntimeError, "Mimetic boo boo : %s\n", RSTRING_PTR(errors));
 }
-    
-    
+
 extern "C"  {
     void Init_mimetic(void) {
         eRuntimeError  = CONST_GET(rb_mKernel, "RuntimeError");
         eArgumentError = CONST_GET(rb_mKernel, "ArgumentError");
         rb_mMimetic = rb_define_module("Mimetic");
         rb_define_module_function(rb_mMimetic, "build", VALUEFUNC(rb_mimetic_build), 1);
+        rb_define_module_function(rb_mMimetic, "load_mime_types", VALUEFUNC(rb_load_mime_types), 1);
     }
 }

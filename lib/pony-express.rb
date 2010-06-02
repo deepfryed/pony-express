@@ -6,6 +6,8 @@ module PonyExpress
   TRANSPORTS = [ :smtp, :sendmail ]
   DEFAULT_SMTP_OPTIONS = { :host => 'localhost', :port => '25', :domain => 'localhost.localdomain' }
 
+  Mimetic.load_mime_types File.dirname(__FILE__) + "/../mime.types"
+
   def self.build options
     # TODO validation.
     Mimetic.build(options)
@@ -25,6 +27,8 @@ module PonyExpress
       raise ArgumentError, ":via can be one of #{TRANSPORTS}"
     end
   end
+
+  private
 
   def self.sendmail_binary
     sendmail = `which sendmail`.chomp
@@ -56,4 +60,5 @@ module PonyExpress
     smtp.send_message content, from, to
     smtp.finish
   end
+
 end
