@@ -26,7 +26,8 @@ map<string, string> MimeTypes;
 /* RFC References
 
 http://www.ietf.org/rfc/rfc2822.txt  Internet Message Format.
-http://www.ietf.org/rfc/rfc1341.txt  MIME Extensions - Multipart related.
+http://www.ietf.org/rfc/rfc2045.txt  MIME Extensions - Multipart related (Part One).
+http://www.ietf.org/rfc/rfc2046.txt  MIME Extensions - Multipart related (Part Deux).
 http://www.ietf.org/rfc/rfc2392.txt  Content-ID and Message-ID.
 
 */
