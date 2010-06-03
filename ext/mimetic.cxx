@@ -81,6 +81,18 @@ void rb_load_mime_types(VALUE self, VALUE filename) {
     }
 }
 
+// TODO
+// angle brackets enclosing content and message ids should be part of libmimetic.
+string content_id() {
+    string cid = ContentId().str();
+    return cid[0] == '<' ? cid : "<" + cid + ">";
+}
+
+string message_id(int n) {
+    string mid = MessageId(n).str();
+    return mid[0] == '<' ? mid : "<" + mid + ">";
+}
+
 VALUE rb_mimetic_build(VALUE self, VALUE options) {
     ostringstream output;
     VALUE attachment;
@@ -123,12 +135,12 @@ VALUE rb_mimetic_build(VALUE self, VALUE options) {
             message->body().parts().push_back(html_part);
             text_part->header().contentType("text/plain; charset=UTF-8");
             text_part->header().contentTransferEncoding("8bit");
-            text_part->header().contentId(tcid == Qnil ? ContentId() : ContentId(RSTRING_PTR(tcid)));
+            text_part->header().contentId(tcid == Qnil ? content_id() + ">" : ContentId(RSTRING_PTR(tcid)));
             text_part->header().mimeVersion(v1);
             text_part->body().assign(RSTRING_PTR(text));
             html_part->header().contentType("text/html; charset=UTF-8");
             html_part->header().contentTransferEncoding("7bit");
-            html_part->header().contentId(hcid == Qnil ? ContentId() : ContentId(RSTRING_PTR(hcid)));
+            html_part->header().contentId(hcid == Qnil ? content_id() + ">" : ContentId(RSTRING_PTR(hcid)));
             html_part->header().mimeVersion(v1);
             html_part->body().assign(RSTRING_PTR(html));
         }
@@ -154,7 +166,7 @@ VALUE rb_mimetic_build(VALUE self, VALUE options) {
         message->header().from(RSTRING_PTR(from));
         message->header().to(RSTRING_PTR(to));
         message->header().subject(RSTRING_PTR(subject));
-        message->header().messageid(1);
+        message->header().messageid(message_id(1));
 
         if (replyto != Qnil) message->header().replyto(RSTRING_PTR(replyto));
         if (cc      != Qnil) message->header().cc(RSTRING_PTR(cc));
