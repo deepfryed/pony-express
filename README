@@ -4,6 +4,7 @@ historical perspective read  http://en.wikipedia.org/wiki/Pony_Express.
 INSTALL:
 
   sudo apt-get install libmimetic-dev
+  sudo apt-get install libpcre++-dev
   sudo gem install pony-express
 
 REQUIREMENT:
@@ -25,6 +26,17 @@ USAGE:
   Don't want to create new mail objects ? Just pass in all options to PonyExpress.mail
 
   >> PonyExpress.mail to: "burns@plant.local", from: "homer@home.local", ...
+
+
+TESTING WITHOUT SENDING EMAIL:
+
+  >> require "pony-express"
+  >> require "pony-express/test"
+  >> mail = PonyExpress::Mail.new to: "burns@plant.local", from: "homer@home.local", via: "sendmail"
+  >> mail.add subject: "Hello Mr.Burns", text: "Can I have more donuts ?"
+  >> mail.dispatch
+  >> assert_equal 1, PonyExpress::Test.mailbox.length
+
 
 TODO:
 
