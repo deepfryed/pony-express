@@ -1,5 +1,7 @@
 #include <ruby.h>
-#include <ruby/encoding.h>
+extern "C" {
+    #include <ruby/encoding.h>
+}
 #include <iostream>
 #include <unistd.h>
 #include <sstream>
@@ -93,6 +95,8 @@ string message_id(int n) {
     return mid[0] == '<' ? mid : "<" + mid + ">";
 }
 
+#define RUBY_ENCODING(str) string(rb_enc_get(str)->name)
+
 VALUE rb_mimetic_build(VALUE self, VALUE options) {
     ostringstream output;
     VALUE attachment;
@@ -107,6 +111,7 @@ VALUE rb_mimetic_build(VALUE self, VALUE options) {
     if (subject == Qnil) rb_raise(eArgumentError, "Mimetic.build called without :subject");
 
     // optional fields
+    VALUE mid     = rb_hash_aref(options, ID2SYM(rb_intern("message_id")));
     VALUE html    = rb_hash_aref(options, ID2SYM(rb_intern("html")));
     VALUE tcid    = rb_hash_aref(options, ID2SYM(rb_intern("text_content_id")));
     VALUE hcid    = rb_hash_aref(options, ID2SYM(rb_intern("html_content_id")));
@@ -114,6 +119,15 @@ VALUE rb_mimetic_build(VALUE self, VALUE options) {
     VALUE cc      = rb_hash_aref(options, ID2SYM(rb_intern("cc")));
     VALUE bcc     = rb_hash_aref(options, ID2SYM(rb_intern("bcc")));
     VALUE files   = rb_hash_aref(options, ID2SYM(rb_intern("attachments")));
+
+    if (mid != Qnil && TYPE(mid) != T_STRING)
+        rb_raise(eArgumentError, "Mimetic.build expects :message_id to be a string");
+
+    if (tcid != Qnil && TYPE(tcid) != T_STRING)
+        rb_raise(eArgumentError, "Mimetic.build expects :text_content_id to be a string");
+
+    if (hcid != Qnil && TYPE(hcid) != T_STRING)
+        rb_raise(eArgumentError, "Mimetic.build expects :html_content_id to be a string");
 
     if (files != Qnil && TYPE(files) != T_ARRAY)
         rb_raise(eArgumentError, "Mimetic.build expects :attachments to be an array");
@@ -133,12 +147,12 @@ VALUE rb_mimetic_build(VALUE self, VALUE options) {
             text_part = new MimeEntity;
             message->body().parts().push_back(text_part);
             message->body().parts().push_back(html_part);
-            text_part->header().contentType("text/plain; charset=UTF-8");
+            text_part->header().contentType("text/plain; charset=" + RUBY_ENCODING(text));
             text_part->header().contentTransferEncoding("8bit");
             text_part->header().contentId(tcid == Qnil ? content_id() + ">" : ContentId(RSTRING_PTR(tcid)));
             text_part->header().mimeVersion(v1);
             text_part->body().assign(RSTRING_PTR(text));
-            html_part->header().contentType("text/html; charset=UTF-8");
+            html_part->header().contentType("text/html; charset=" + RUBY_ENCODING(html));
             html_part->header().contentTransferEncoding("7bit");
             html_part->header().contentId(hcid == Qnil ? content_id() + ">" : ContentId(RSTRING_PTR(hcid)));
             html_part->header().mimeVersion(v1);
@@ -146,7 +160,7 @@ VALUE rb_mimetic_build(VALUE self, VALUE options) {
         }
         else {
             message->body().assign(RSTRING_PTR(text));
-            message->header().contentType("text/plain; charset=UTF-8");
+            message->header().contentType("text/plain; charset=" + RUBY_ENCODING(text));
             message->header().contentTransferEncoding("8bit");
             message->header().mimeVersion(v1);
         }
@@ -166,7 +180,7 @@ VALUE rb_mimetic_build(VALUE self, VALUE options) {
         message->header().from(RSTRING_PTR(from));
         message->header().to(RSTRING_PTR(to));
         message->header().subject(RSTRING_PTR(subject));
-        message->header().messageid(message_id(1));
+        message->header().messageid(mid != Qnil ? RSTRING_PTR(mid) : message_id(1));
 
         if (replyto != Qnil) message->header().replyto(RSTRING_PTR(replyto));
         if (cc      != Qnil) message->header().cc(RSTRING_PTR(cc));
