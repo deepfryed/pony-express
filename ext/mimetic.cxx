@@ -12,6 +12,8 @@ extern "C" {
 
 #define ID_CONST_GET rb_intern("const_get")
 #define CONST_GET(scope, constant) (rb_funcall(scope, ID_CONST_GET, 1, rb_str_new2(constant)))
+#define RUBY_ENCODING(str) string(rb_enc_get(str)->name)
+#define VALUEFUNC(f) ((VALUE (*)(ANYARGS)) f)
 
 static VALUE rb_mMimetic;
 static VALUE eRuntimeError;
@@ -20,8 +22,6 @@ static VALUE eArgumentError;
 using namespace std;
 using namespace mimetic;
 using namespace pcrepp;
-
-#define VALUEFUNC(f) ((VALUE (*)(ANYARGS)) f)
 
 map<string, string> MimeTypes;
 
@@ -33,6 +33,18 @@ http://www.ietf.org/rfc/rfc2046.txt  MIME Extensions - Multipart related (Part D
 http://www.ietf.org/rfc/rfc2392.txt  Content-ID and Message-ID.
 
 */
+
+// TODO
+// angle brackets enclosing content and message ids should be part of libmimetic.
+string content_id() {
+    string cid = ContentId().str();
+    return cid[0] == '<' ? cid : "<" + cid + ">";
+}
+
+string message_id(int n) {
+    string mid = MessageId(n).str();
+    return mid[0] == '<' ? mid : "<" + mid + ">";
+}
 
 string file_mime_type(string file) {
     Pcre regex("\\.");
@@ -64,6 +76,8 @@ bool mimetic_attach_file(MimeEntity *m, char* filename) {
     return false;
 }
 
+// Exposed API
+
 void rb_load_mime_types(VALUE self, VALUE filename) {
     char buffer[4096];
     vector<string> data;
@@ -82,20 +96,6 @@ void rb_load_mime_types(VALUE self, VALUE filename) {
         rb_raise(eRuntimeError, "Mimetic: Unable to load mime.types");
     }
 }
-
-// TODO
-// angle brackets enclosing content and message ids should be part of libmimetic.
-string content_id() {
-    string cid = ContentId().str();
-    return cid[0] == '<' ? cid : "<" + cid + ">";
-}
-
-string message_id(int n) {
-    string mid = MessageId(n).str();
-    return mid[0] == '<' ? mid : "<" + mid + ">";
-}
-
-#define RUBY_ENCODING(str) string(rb_enc_get(str)->name)
 
 VALUE rb_mimetic_build(VALUE self, VALUE options) {
     ostringstream output;
