@@ -14,10 +14,12 @@ extern "C" {
 #define CONST_GET(scope, constant) (rb_funcall(scope, ID_CONST_GET, 1, rb_str_new2(constant)))
 #define RUBY_ENCODING(str) string(rb_enc_get(str)->name)
 #define VALUEFUNC(f) ((VALUE (*)(ANYARGS)) f)
+#define FORCE_ENCODING(str,enc) rb_enc_associate(str, rb_to_encoding(enc)); ENC_CODERANGE_CLEAR(str);
 
 static VALUE rb_mMimetic;
 static VALUE eRuntimeError;
 static VALUE eArgumentError;
+static VALUE rb_UTF8, rb_ASCII;
 
 using namespace std;
 using namespace mimetic;
@@ -74,6 +76,34 @@ bool mimetic_attach_file(MimeEntity *m, char* filename) {
         rb_raise(eRuntimeError, "Mimetic: Unable to read attachment file %s", filename);
     }
     return false;
+}
+
+string safe_rfc2047(string v) {
+    Pcre re1("\\?");
+    Pcre re2("_");
+    Pcre re3(" ");
+    v = re1.replace(v, "=3F");
+    v = re2.replace(v, "=5F");
+    v = re3.replace(v, "_");
+    return v;
+}
+
+string quoted_printable(VALUE str) {
+    VALUE ascii = rb_str_new2(RSTRING_PTR(str));
+    FORCE_ENCODING(ascii, rb_ASCII);
+    if (rb_str_cmp(ascii, str) != 0) {
+        string raw = RSTRING_PTR(str);
+        QP::Encoder qp;
+        istringstream is(raw);
+        ostringstream encoded;
+        istreambuf_iterator<char> ibeg(is), iend;
+        ostreambuf_iterator<char> oi(encoded);
+        encode(ibeg, iend, qp, oi);
+        return "=?" + RUBY_ENCODING(str) + "?Q?" + safe_rfc2047(encoded.str()) + "?=";
+    }
+    else {
+        return string(RSTRING_PTR(str));
+    }
 }
 
 // Exposed API
@@ -179,7 +209,7 @@ VALUE rb_mimetic_build(VALUE self, VALUE options) {
 
         message->header().from(RSTRING_PTR(from));
         message->header().to(RSTRING_PTR(to));
-        message->header().subject(RSTRING_PTR(subject));
+        message->header().subject(quoted_printable(subject));
         message->header().messageid(mid != Qnil ? RSTRING_PTR(mid) : message_id(1));
 
         if (replyto != Qnil) message->header().replyto(RSTRING_PTR(replyto));
@@ -209,5 +239,7 @@ extern "C"  {
         rb_mMimetic = rb_define_module("Mimetic");
         rb_define_module_function(rb_mMimetic, "build", VALUEFUNC(rb_mimetic_build), 1);
         rb_define_module_function(rb_mMimetic, "load_mime_types", VALUEFUNC(rb_load_mime_types), 1);
+        rb_UTF8  = rb_str_new2("UTF-8");
+        rb_ASCII = rb_str_new2("US-ASCII");
     }
 }
