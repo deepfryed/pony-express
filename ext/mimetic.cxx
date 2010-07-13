@@ -7,8 +7,9 @@ extern "C" {
 #include <sstream>
 #include <exception>
 #include <algorithm>
-#include <pcre++.h>
+#include <pcrecpp.h>
 #include <mimetic/mimetic.h>
+#include <map>
 
 #define ID_CONST_GET rb_intern("const_get")
 #define CONST_GET(scope, constant) (rb_funcall(scope, ID_CONST_GET, 1, rb_str_new2(constant)))
@@ -23,7 +24,7 @@ static VALUE rb_UTF8, rb_ASCII;
 
 using namespace std;
 using namespace mimetic;
-using namespace pcrepp;
+using namespace pcrecpp;
 
 map<string, string> MimeTypes;
 
@@ -49,8 +50,8 @@ string message_id(int n) {
 }
 
 string file_mime_type(string file) {
-    Pcre regex("\\.");
-    string extn = regex.split(file).back();
+    string extn;
+    RE("(?:.*)\\.([^\\.]+)$").FullMatch(file, &extn);
     transform(extn.begin(), extn.end(), extn.begin(), ::tolower);
     string mime = MimeTypes[extn];
     return mime.length() > 0 ? mime : "application/octet-stream";
@@ -79,12 +80,9 @@ bool mimetic_attach_file(MimeEntity *m, char* filename) {
 }
 
 string safe_rfc2047(string v) {
-    Pcre re1("\\?");
-    Pcre re2("_");
-    Pcre re3(" ");
-    v = re1.replace(v, "=3F");
-    v = re2.replace(v, "=5F");
-    v = re3.replace(v, "_");
+    RE("\\?").GlobalReplace("=3F", &v);
+    RE("_").GlobalReplace("=5F", &v);
+    RE(" ").GlobalReplace("_", &v);
     return v;
 }
 
@@ -109,16 +107,19 @@ string quoted_printable(VALUE str) {
 // Exposed API
 
 void rb_load_mime_types(VALUE self, VALUE filename) {
+    string piece;
     char buffer[4096];
     vector<string> data;
-    Pcre regex("[\\r\\n\\t]+");
+    RE regex("(.+?)(?:[\\r\\n\\t]+|$)");
     ifstream file(RSTRING_PTR(filename), ios::in);
     if (file.is_open()) {
         while (!file.eof()) {
             file.getline(buffer, 4096);
-            data = regex.split(buffer);
+            StringPiece input(buffer);
+            while (regex.Consume(&input, &piece)) data.push_back(piece);
             for (int i = 1; i < data.size(); i++)
                 MimeTypes[data[i]] = data[0];
+            data.clear();
         }
         file.close();
     }

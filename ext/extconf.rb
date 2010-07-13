@@ -7,10 +7,7 @@ $CFLAGS = "-DHAVE_INTTYPES_H"
 Config::CONFIG['CC']  = 'g++'
 Config::CONFIG['CPP'] = 'g++'
 
-headers_mimetic = [ 'stdio.h', 'mimetic/mimetic.h' ]
-headers_pcrecpp = [ 'stdio.h', 'pcre++.h' ]
-
-if !have_library('mimetic',  nil, headers_mimetic)
+if !have_library('mimetic')
   puts <<-ERROR
 
     Cannot find mimetic headers or libraries.
@@ -20,11 +17,11 @@ if !have_library('mimetic',  nil, headers_mimetic)
   exit 1
 end
 
-if !have_library('pcre++',  nil, headers_pcrecpp)
+if !have_library('pcrecpp')
   puts <<-ERROR
 
-    Cannot find pcre++ headers or libraries.
-    Try sudo apt-get install libpcre++-dev on debian flavors of linux.
+    Cannot find pcrecpp headers or libraries from pcre3.
+    Try sudo apt-get install libpcre3-dev on debian flavors of linux.
 
   ERROR
   exit 1
