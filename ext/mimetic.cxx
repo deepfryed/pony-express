@@ -16,12 +16,10 @@ extern "C" {
 #define RUBY_ENCODING(str) string(rb_enc_get(str)->name)
 #define VALUEFUNC(f) ((VALUE (*)(ANYARGS)) f)
 #define FORCE_ENCODING(str,enc) rb_enc_associate(str, rb_to_encoding(enc)); ENC_CODERANGE_CLEAR(str);
-#define TO_S(v)                    rb_funcall(v, rb_intern("to_s"), 0)
-#define CSTRING(v)                 RSTRING_PTR(TYPE(v) != T_STRING ? TO_S(v) : v)
+#define TO_S(v)                 rb_funcall(v, rb_intern("to_s"), 0)
+#define CSTRING(v)              RSTRING_PTR(TYPE(v) != T_STRING ? TO_S(v) : v)
 
 static VALUE rb_mMimetic;
-static VALUE eRuntimeError;
-static VALUE eArgumentError;
 static VALUE rb_UTF8, rb_ASCII;
 
 using namespace std;
@@ -76,7 +74,7 @@ bool mimetic_attach_file(MimeEntity *m, char* filename) {
         return true;
     }
     else {
-        rb_raise(eRuntimeError, "Mimetic: Unable to read attachment file %s", filename);
+        rb_raise(rb_eRuntimeError, "Mimetic: Unable to read attachment file %s", filename);
     }
     return false;
 }
@@ -126,7 +124,7 @@ void rb_load_mime_types(VALUE self, VALUE filename) {
         file.close();
     }
     else {
-        rb_raise(eRuntimeError, "Mimetic: Unable to load mime.types");
+        rb_raise(rb_eRuntimeError, "Mimetic: Unable to load mime.types");
     }
 }
 
@@ -138,10 +136,10 @@ VALUE rb_mimetic_build(VALUE self, VALUE options) {
     VALUE from    = rb_hash_aref(options, ID2SYM(rb_intern("from")));
     VALUE subject = rb_hash_aref(options, ID2SYM(rb_intern("subject")));
 
-    if (text    == Qnil) rb_raise(eArgumentError, "Mimetic.build called without :text");
-    if (from    == Qnil) rb_raise(eArgumentError, "Mimetic.build called without :from");
-    if (to      == Qnil) rb_raise(eArgumentError, "Mimetic.build called without :to");
-    if (subject == Qnil) rb_raise(eArgumentError, "Mimetic.build called without :subject");
+    if (text    == Qnil) rb_raise(rb_eArgError, "Mimetic.build called without :text");
+    if (from    == Qnil) rb_raise(rb_eArgError, "Mimetic.build called without :from");
+    if (to      == Qnil) rb_raise(rb_eArgError, "Mimetic.build called without :to");
+    if (subject == Qnil) rb_raise(rb_eArgError, "Mimetic.build called without :subject");
 
     // optional fields
     VALUE mid     = rb_hash_aref(options, ID2SYM(rb_intern("message_id")));
@@ -154,16 +152,16 @@ VALUE rb_mimetic_build(VALUE self, VALUE options) {
     VALUE files   = rb_hash_aref(options, ID2SYM(rb_intern("attachments")));
 
     if (mid != Qnil && TYPE(mid) != T_STRING)
-        rb_raise(eArgumentError, "Mimetic.build expects :message_id to be a string");
+        rb_raise(rb_eArgError, "Mimetic.build expects :message_id to be a string");
 
     if (tcid != Qnil && TYPE(tcid) != T_STRING)
-        rb_raise(eArgumentError, "Mimetic.build expects :text_content_id to be a string");
+        rb_raise(rb_eArgError, "Mimetic.build expects :text_content_id to be a string");
 
     if (hcid != Qnil && TYPE(hcid) != T_STRING)
-        rb_raise(eArgumentError, "Mimetic.build expects :html_content_id to be a string");
+        rb_raise(rb_eArgError, "Mimetic.build expects :html_content_id to be a string");
 
     if (files != Qnil && TYPE(files) != T_ARRAY)
-        rb_raise(eArgumentError, "Mimetic.build expects :attachments to be an array");
+        rb_raise(rb_eArgError, "Mimetic.build expects :attachments to be an array");
 
     VALUE errors  = Qnil;
     MimeEntity *message   = NULL;
@@ -232,17 +230,18 @@ VALUE rb_mimetic_build(VALUE self, VALUE options) {
         errors = rb_str_new2("Unknown Error");
     }
 
-    rb_raise(eRuntimeError, "Mimetic boo boo : %s\n", CSTRING(errors));
+    rb_raise(rb_eRuntimeError, "Mimetic boo boo : %s\n", CSTRING(errors));
 }
 
 extern "C"  {
     void Init_mimetic(void) {
-        eRuntimeError  = CONST_GET(rb_mKernel, "RuntimeError");
-        eArgumentError = CONST_GET(rb_mKernel, "ArgumentError");
         rb_mMimetic = rb_define_module("Mimetic");
         rb_define_module_function(rb_mMimetic, "build", VALUEFUNC(rb_mimetic_build), 1);
         rb_define_module_function(rb_mMimetic, "load_mime_types", VALUEFUNC(rb_load_mime_types), 1);
         rb_UTF8  = rb_str_new2("UTF-8");
         rb_ASCII = rb_str_new2("US-ASCII");
+
+        rb_global_variable(&rb_UTF8);
+        rb_global_variable(&rb_ASCII);
     }
 }
