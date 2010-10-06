@@ -16,6 +16,8 @@ extern "C" {
 #define RUBY_ENCODING(str) string(rb_enc_get(str)->name)
 #define VALUEFUNC(f) ((VALUE (*)(ANYARGS)) f)
 #define FORCE_ENCODING(str,enc) rb_enc_associate(str, rb_to_encoding(enc)); ENC_CODERANGE_CLEAR(str);
+#define TO_S(v)                    rb_funcall(v, rb_intern("to_s"), 0)
+#define CSTRING(v)                 RSTRING_PTR(TYPE(v) != T_STRING ? TO_S(v) : v)
 
 static VALUE rb_mMimetic;
 static VALUE eRuntimeError;
@@ -87,10 +89,10 @@ string safe_rfc2047(string v) {
 }
 
 string quoted_printable(VALUE str) {
-    VALUE ascii = rb_str_new2(RSTRING_PTR(str));
+    VALUE ascii = rb_str_new2(CSTRING(str));
     FORCE_ENCODING(ascii, rb_ASCII);
     if (rb_str_cmp(ascii, str) != 0) {
-        string raw = RSTRING_PTR(str);
+        string raw = CSTRING(str);
         QP::Encoder qp;
         istringstream is(raw);
         ostringstream encoded;
@@ -100,7 +102,7 @@ string quoted_printable(VALUE str) {
         return "=?" + RUBY_ENCODING(str) + "?Q?" + safe_rfc2047(encoded.str()) + "?=";
     }
     else {
-        return string(RSTRING_PTR(str));
+        return string(CSTRING(str));
     }
 }
 
@@ -111,7 +113,7 @@ void rb_load_mime_types(VALUE self, VALUE filename) {
     char buffer[4096];
     vector<string> data;
     RE regex("(.+?)(?:[\\r\\n\\t]+|$)");
-    ifstream file(RSTRING_PTR(filename), ios::in);
+    ifstream file(CSTRING(filename), ios::in);
     if (file.is_open()) {
         while (!file.eof()) {
             file.getline(buffer, 4096);
@@ -180,17 +182,17 @@ VALUE rb_mimetic_build(VALUE self, VALUE options) {
             message->body().parts().push_back(html_part);
             text_part->header().contentType("text/plain; charset=" + RUBY_ENCODING(text));
             text_part->header().contentTransferEncoding("8bit");
-            text_part->header().contentId(tcid == Qnil ? content_id() + ">" : ContentId(RSTRING_PTR(tcid)));
+            text_part->header().contentId(tcid == Qnil ? content_id() + ">" : ContentId(CSTRING(tcid)));
             text_part->header().mimeVersion(v1);
-            text_part->body().assign(RSTRING_PTR(text));
+            text_part->body().assign(CSTRING(text));
             html_part->header().contentType("text/html; charset=" + RUBY_ENCODING(html));
             html_part->header().contentTransferEncoding("7bit");
-            html_part->header().contentId(hcid == Qnil ? content_id() + ">" : ContentId(RSTRING_PTR(hcid)));
+            html_part->header().contentId(hcid == Qnil ? content_id() + ">" : ContentId(CSTRING(hcid)));
             html_part->header().mimeVersion(v1);
-            html_part->body().assign(RSTRING_PTR(html));
+            html_part->body().assign(CSTRING(html));
         }
         else {
-            message->body().assign(RSTRING_PTR(text));
+            message->body().assign(CSTRING(text));
             message->header().contentType("text/plain; charset=" + RUBY_ENCODING(text));
             message->header().contentTransferEncoding("8bit");
             message->header().mimeVersion(v1);
@@ -204,18 +206,18 @@ VALUE rb_mimetic_build(VALUE self, VALUE options) {
             for (long i = 0; i < RARRAY_LEN(files); i++) {
                 attachment = rb_ary_entry(files, i);
                 if (attachment != Qnil && TYPE(attachment) == T_STRING)
-                    mimetic_attach_file(message, RSTRING_PTR(attachment));
+                    mimetic_attach_file(message, CSTRING(attachment));
             }
         }
 
-        message->header().from(RSTRING_PTR(from));
-        message->header().to(RSTRING_PTR(to));
+        message->header().from(CSTRING(from));
+        message->header().to(CSTRING(to));
         message->header().subject(quoted_printable(subject));
-        message->header().messageid(mid != Qnil ? RSTRING_PTR(mid) : message_id(1));
+        message->header().messageid(mid != Qnil ? CSTRING(mid) : message_id(1));
 
-        if (replyto != Qnil) message->header().replyto(RSTRING_PTR(replyto));
-        if (cc      != Qnil) message->header().cc(RSTRING_PTR(cc));
-        if (bcc     != Qnil) message->header().bcc(RSTRING_PTR(bcc));
+        if (replyto != Qnil) message->header().replyto(CSTRING(replyto));
+        if (cc      != Qnil) message->header().cc(CSTRING(cc));
+        if (bcc     != Qnil) message->header().bcc(CSTRING(bcc));
 
         output << *message << endl;
         delete message;
@@ -230,7 +232,7 @@ VALUE rb_mimetic_build(VALUE self, VALUE options) {
         errors = rb_str_new2("Unknown Error");
     }
 
-    rb_raise(eRuntimeError, "Mimetic boo boo : %s\n", RSTRING_PTR(errors));
+    rb_raise(eRuntimeError, "Mimetic boo boo : %s\n", CSTRING(errors));
 }
 
 extern "C"  {
