@@ -13,6 +13,27 @@ module PonyExpress
     Mimetic.build(options)
   end
 
+  # Build and dispatch email in one go.
+  #
+  # @example mail.
+  #  require "pony-express"
+  #  PonyExpress.mail to: "burns@plant.local", from: "homer@home.local", via: "sendmail",
+  #                   subject: "Hello Mr.Burns", text: "Can I have more donuts ?",
+  #                   html: "<strong>More Dooooonuuuuts!</strong>",
+  #                   attachments: [ "/home/homer/donuts.png" ],
+  #                   headers: [{name: "X-FooBar", value: "test"}]
+  #
+  # @param  [String]  to            Email address.
+  # @param  [String]  from          Email address.
+  # @param  [String]  subject       Subject (will be converted to quoted printable if needed).
+  # @param  [String]  text          Plain text content.
+  # @param  [String]  cc            Email address (optional).
+  # @param  [String]  bcc           Email address (optional).
+  # @param  [String]  replyto       Email address (optional).
+  # @param  [String]  html          HTML content (optional).
+  # @param  [Array]   attachments   List of email attachments (optional).
+  # @param  [Array]   headers       List of email headers (optional).
+  # @return [TrueClass or FalseClass]
   def mail options
     via = (options.delete(:via) || :smtp).to_sym
     via_options = options.delete(:via_options) || {}
@@ -66,19 +87,37 @@ module PonyExpress
       @options = opt
     end
 
+
+    # Add an option.
+    #
+    # @example add.
+    #  require "pony-express"
+    #  mail = PonyExpress::Mail.new
+    #  mail.add to: "burns@plant.local"
     def add opt
       @options.merge! opt
     end
 
+    # Remove an option.
+    #
+    # @example remove.
+    #  require "pony-express"
+    #  mail = PonyExpress::Mail.new
+    #  mail.add to: "burns@plant.local", cc: "smithers@plant.local"
+    #  mail.remove :cc
     def remove opt
       keys = opt.keys
       @options.reject! {|k, v| keys.include?(k) }
     end
 
+    # Send the email via the selected transport.
+    #
     def dispatch
       mail(@options)
     end
 
+    # Return the encoded email content.
+    #
     def content
       build(@options)
     end
