@@ -150,6 +150,7 @@ VALUE rb_mimetic_build(VALUE self, VALUE options) {
     VALUE cc      = rb_hash_aref(options, ID2SYM(rb_intern("cc")));
     VALUE bcc     = rb_hash_aref(options, ID2SYM(rb_intern("bcc")));
     VALUE files   = rb_hash_aref(options, ID2SYM(rb_intern("attachments")));
+    VALUE headers = rb_hash_aref(options, ID2SYM(rb_intern("headers")));
 
     if (mid != Qnil && TYPE(mid) != T_STRING)
         rb_raise(rb_eArgError, "Mimetic.build expects :message_id to be a string");
@@ -163,6 +164,9 @@ VALUE rb_mimetic_build(VALUE self, VALUE options) {
     if (files != Qnil && TYPE(files) != T_ARRAY)
         rb_raise(rb_eArgError, "Mimetic.build expects :attachments to be an array");
 
+    if (headers != Qnil && TYPE(headers) != T_ARRAY)
+        rb_raise(rb_eArgError, "Mimetic.build expects :headers to be an array");
+
     VALUE errors  = Qnil;
     MimeEntity *message   = NULL;
     MimeEntity *html_part = NULL;
@@ -171,6 +175,7 @@ VALUE rb_mimetic_build(VALUE self, VALUE options) {
 
     try {
         message = new MimeEntity;
+
         if (html != Qnil && text != Qnil) {
             delete message;
             message = new MultipartAlternative;
@@ -217,16 +222,34 @@ VALUE rb_mimetic_build(VALUE self, VALUE options) {
         if (cc      != Qnil) message->header().cc(CSTRING(cc));
         if (bcc     != Qnil) message->header().bcc(CSTRING(bcc));
 
+        if (headers != Qnil) {
+            for (long i = 0; i < RARRAY_LEN(headers); i++) {
+                VALUE header = rb_ary_entry(headers, i);
+                if (TYPE(header) != T_HASH)
+                    throw "Mimetic.build header should be a hash with :name and :value";
+                string name  = CSTRING(rb_hash_aref(header, ID2SYM(rb_intern("name"))));
+                string value = CSTRING(rb_hash_aref(header, ID2SYM(rb_intern("value"))));
+                if (name.length() && value.length()) {
+                    Field f(name, value);
+                    message->header().field("") = f;
+                }
+            }
+        }
+
         output << *message << endl;
         delete message;
         return rb_str_new2(output.str().c_str());
     }
     catch(exception &e) {
-        if (message   != NULL) delete message;
+        if (message) delete message;
         errors = rb_str_new2(e.what());
     }
+    catch(string &e) {
+        if (message) delete message;
+        errors = rb_str_new2(e.c_str());
+    }
     catch (...) {
-        if (message   != NULL) delete message;
+        if (message) delete message;
         errors = rb_str_new2("Unknown Error");
     }
 
