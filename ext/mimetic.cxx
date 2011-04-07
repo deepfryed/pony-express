@@ -18,6 +18,8 @@ extern "C" {
 #define FORCE_ENCODING(str,enc) rb_enc_associate(str, rb_to_encoding(enc)); ENC_CODERANGE_CLEAR(str);
 #define TO_S(v)                 rb_funcall(v, rb_intern("to_s"), 0)
 #define CSTRING(v)              RSTRING_PTR(TYPE(v) != T_STRING ? TO_S(v) : v)
+#define RBSTRING(v)             rb_str_new2(v.c_str())
+#define SYM(v)                  ID2SYM(rb_intern(v))
 
 static VALUE rb_mMimetic;
 static VALUE rb_UTF8, rb_ASCII;
@@ -74,7 +76,7 @@ bool mimetic_attach_file(MimeEntity *m, char* filename) {
         return true;
     }
     else {
-        rb_raise(rb_eRuntimeError, "Mimetic: Unable to read attachment file %s", filename);
+        rb_raise(rb_eRuntimeError, "Unable to read attachment file %s", filename);
     }
     return false;
 }
@@ -124,17 +126,17 @@ void rb_load_mime_types(VALUE self, VALUE filename) {
         file.close();
     }
     else {
-        rb_raise(rb_eRuntimeError, "Mimetic: Unable to load mime.types");
+        rb_raise(rb_eRuntimeError, "Unable to load mime.types");
     }
 }
 
 VALUE rb_mimetic_build(VALUE self, VALUE options) {
     ostringstream output;
     VALUE attachment;
-    VALUE text    = rb_hash_aref(options, ID2SYM(rb_intern("text")));
-    VALUE to      = rb_hash_aref(options, ID2SYM(rb_intern("to")));
-    VALUE from    = rb_hash_aref(options, ID2SYM(rb_intern("from")));
-    VALUE subject = rb_hash_aref(options, ID2SYM(rb_intern("subject")));
+    VALUE text    = rb_hash_aref(options, SYM("text"));
+    VALUE to      = rb_hash_aref(options, SYM("to"));
+    VALUE from    = rb_hash_aref(options, SYM("from"));
+    VALUE subject = rb_hash_aref(options, SYM("subject"));
 
     if (text    == Qnil) rb_raise(rb_eArgError, "Mimetic.build called without :text");
     if (from    == Qnil) rb_raise(rb_eArgError, "Mimetic.build called without :from");
@@ -142,14 +144,14 @@ VALUE rb_mimetic_build(VALUE self, VALUE options) {
     if (subject == Qnil) rb_raise(rb_eArgError, "Mimetic.build called without :subject");
 
     // optional fields
-    VALUE mid     = rb_hash_aref(options, ID2SYM(rb_intern("message_id")));
-    VALUE html    = rb_hash_aref(options, ID2SYM(rb_intern("html")));
-    VALUE tcid    = rb_hash_aref(options, ID2SYM(rb_intern("text_content_id")));
-    VALUE hcid    = rb_hash_aref(options, ID2SYM(rb_intern("html_content_id")));
-    VALUE replyto = rb_hash_aref(options, ID2SYM(rb_intern("replyto")));
-    VALUE cc      = rb_hash_aref(options, ID2SYM(rb_intern("cc")));
-    VALUE bcc     = rb_hash_aref(options, ID2SYM(rb_intern("bcc")));
-    VALUE files   = rb_hash_aref(options, ID2SYM(rb_intern("attachments")));
+    VALUE mid     = rb_hash_aref(options, SYM("message_id"));
+    VALUE html    = rb_hash_aref(options, SYM("html"));
+    VALUE tcid    = rb_hash_aref(options, SYM("text_content_id"));
+    VALUE hcid    = rb_hash_aref(options, SYM("html_content_id"));
+    VALUE replyto = rb_hash_aref(options, SYM("replyto"));
+    VALUE cc      = rb_hash_aref(options, SYM("cc"));
+    VALUE bcc     = rb_hash_aref(options, SYM("bcc"));
+    VALUE files   = rb_hash_aref(options, SYM("attachments"));
 
     if (mid != Qnil && TYPE(mid) != T_STRING)
         rb_raise(rb_eArgError, "Mimetic.build expects :message_id to be a string");
@@ -164,16 +166,16 @@ VALUE rb_mimetic_build(VALUE self, VALUE options) {
         rb_raise(rb_eArgError, "Mimetic.build expects :attachments to be an array");
 
     VALUE errors  = Qnil;
-    MimeEntity *message   = NULL;
-    MimeEntity *html_part = NULL;
-    MimeEntity *text_part = NULL;
+    MimeEntity *message   = 0;
+    MimeEntity *html_part = 0;
+    MimeEntity *text_part = 0;
     MimeVersion v1("1.0");
 
     try {
         message = new MimeEntity;
         if (html != Qnil && text != Qnil) {
             delete message;
-            message = new MultipartAlternative;
+            message   = new MultipartAlternative;
             html_part = new MimeEntity;
             text_part = new MimeEntity;
             message->body().parts().push_back(text_part);
@@ -222,21 +224,78 @@ VALUE rb_mimetic_build(VALUE self, VALUE options) {
         return rb_str_new2(output.str().c_str());
     }
     catch(exception &e) {
-        if (message   != NULL) delete message;
+        if (message) delete message;
         errors = rb_str_new2(e.what());
     }
     catch (...) {
-        if (message   != NULL) delete message;
+        if (message) delete message;
         errors = rb_str_new2("Unknown Error");
     }
 
-    rb_raise(rb_eRuntimeError, "Mimetic boo boo : %s\n", CSTRING(errors));
+    rb_raise(rb_eRuntimeError, "%s\n", CSTRING(errors));
+}
+
+VALUE parse_mime_parts(MimeEntity &me) {
+    VALUE contents = rb_ary_new();
+    MimeEntityList::const_iterator curr = me.body().parts().begin(), end = me.body().parts().end();
+    while (curr != end) {
+        VALUE content = rb_hash_new();
+        MimeEntity *part = *curr;
+
+        rb_hash_aset(content, SYM("type"), RBSTRING(part->header().contentType().str()));
+        if (part->header().contentType().isMultipart()) {
+            rb_hash_aset(content, SYM("content"), parse_mime_parts(*part));
+        }
+        else {
+            rb_hash_aset(content, SYM("content"),      RBSTRING(part->body()));
+            rb_hash_aset(content, SYM("encoding"),     RBSTRING(part->header().contentTransferEncoding().str()));
+            rb_hash_aset(content, SYM("disposition"),  RBSTRING(part->header().contentDisposition().str()));
+        }
+        rb_ary_push(contents, content);
+        curr++;
+    }
+    return contents;
+}
+
+VALUE rb_mimetic_parse(VALUE self, VALUE data) {
+    if (NIL_P(data))
+        return Qnil;
+
+    VALUE errors  = Qnil;
+
+    try {
+        stringstream mime;
+        mime << CSTRING(data);
+        MimeEntity me;
+        me.load(mime);
+
+        VALUE message = rb_hash_new();
+
+        rb_hash_aset(message, SYM("from"),    RBSTRING(me.header().from().str()));
+        rb_hash_aset(message, SYM("to"),      RBSTRING(me.header().to().str()));
+        rb_hash_aset(message, SYM("subject"), RBSTRING(me.header().subject()));
+        rb_hash_aset(message, SYM("cc"),      RBSTRING(me.header().cc().str()));
+        rb_hash_aset(message, SYM("bcc"),     RBSTRING(me.header().bcc().str()));
+        rb_hash_aset(message, SYM("replyto"), RBSTRING(me.header().replyto().str()));
+
+        rb_hash_aset(message, SYM("contents"), parse_mime_parts(me));
+        return message;
+    }
+    catch(exception &e) {
+        errors = rb_str_new2(e.what());
+    }
+    catch (...) {
+        errors = rb_str_new2("Unknown Error");
+    }
+
+    rb_raise(rb_eRuntimeError, "%s\n", CSTRING(errors));
 }
 
 extern "C"  {
     void Init_mimetic(void) {
         rb_mMimetic = rb_define_module("Mimetic");
         rb_define_module_function(rb_mMimetic, "build", VALUEFUNC(rb_mimetic_build), 1);
+        rb_define_module_function(rb_mMimetic, "parse", VALUEFUNC(rb_mimetic_parse), 1);
         rb_define_module_function(rb_mMimetic, "load_mime_types", VALUEFUNC(rb_load_mime_types), 1);
         rb_UTF8  = rb_str_new2("UTF-8");
         rb_ASCII = rb_str_new2("US-ASCII");

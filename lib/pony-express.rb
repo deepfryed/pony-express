@@ -3,8 +3,9 @@ begin; require 'smtp_tls'; rescue LoadError; end
 require_relative '../ext/mimetic'
 
 module PonyExpress
-  TRANSPORTS = [ :smtp, :sendmail ]
-  DEFAULT_SMTP_OPTIONS = { :host => 'localhost', :port => '25', :domain => 'localhost.localdomain' }
+  TRANSPORTS           = [ :smtp, :sendmail ]
+  DEFAULT_SMTP_OPTIONS = { host: 'localhost', port: '25', domain: 'localhost.localdomain' }
+  @@sendmail_binary    = '/usr/sbin/sendmail'
 
   Mimetic.load_mime_types File.dirname(__FILE__) + "/../mime.types"
 
@@ -13,8 +14,12 @@ module PonyExpress
     Mimetic.build(options)
   end
 
+  def parse content
+    Mimetic.parse(content)
+  end
+
   def mail options
-    via = (options.delete(:via) || :smtp).to_sym
+    via         = options.delete(:via)         || :smtp
     via_options = options.delete(:via_options) || {}
 
     if TRANSPORTS.include? via
@@ -27,22 +32,19 @@ module PonyExpress
     end
   end
 
+  def sendmail_binary= binary
+    @@sendmail_binary = binary
+  end
+
   def sendmail_binary
-    sendmail = `which sendmail`.chomp
-    sendmail.empty? ? '/usr/sbin/sendmail' : sendmail
+    @@sendmail_binary
   end
 
-  def transport_via_sendmail content, options={}
-    IO.popen('-', 'w+') do |pipe|
-      if pipe
-        pipe.write(content)
-      else
-        exec(sendmail_binary, "-t")
-      end
-    end
+  def transport_via_sendmail content, options = {}
+    IO.popen([sendmail_binary, '-t'], 'w') {|io| io.write(content)}
   end
 
-  def transport_via_smtp content, from, to, options={}
+  def transport_via_smtp content, from, to, options = {}
     o = DEFAULT_SMTP_OPTIONS.merge(options)
     smtp = Net::SMTP.new(o[:host], o[:port])
     if o[:tls]
