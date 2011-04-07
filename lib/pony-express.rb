@@ -45,9 +45,9 @@ module PonyExpress
     via_options = options.delete(:via_options) || {}
 
     if TRANSPORTS.include? via
-      case via
-      when :sendmail then transport_via_sendmail build(options), via_options
-      when :smtp     then transport_via_smtp build(options), options[:from], options[:to], via_options
+      case via.to_sym
+        when :sendmail then transport_via_sendmail build(options), via_options
+        when :smtp     then transport_via_smtp build(options), options[:from], options[:to], via_options
       end
     else
       raise ArgumentError, ":via can be one of #{TRANSPORTS}"
