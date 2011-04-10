@@ -43,9 +43,10 @@ module PonyExpress
   def mail options
     via         = options.delete(:via)         || :smtp
     via_options = options.delete(:via_options) || {}
+    via         = via.to_sym
 
     if TRANSPORTS.include? via
-      case via.to_sym
+      case via
         when :sendmail then transport_via_sendmail build(options), via_options
         when :smtp     then transport_via_smtp build(options), options[:from], options[:to], via_options
       end
@@ -86,8 +87,8 @@ module PonyExpress
     include PonyExpress
     attr_accessor :options
 
-    def initialize opt={}
-      @options = opt
+    def initialize options = {}
+      @options = options
     end
 
 
@@ -97,8 +98,8 @@ module PonyExpress
     #  require "pony-express"
     #  mail = PonyExpress::Mail.new
     #  mail.add to: "burns@plant.local"
-    def add opt
-      @options.merge! opt
+    def add options
+      @options.merge! options
     end
 
     # Remove an option.
@@ -108,8 +109,8 @@ module PonyExpress
     #  mail = PonyExpress::Mail.new
     #  mail.add to: "burns@plant.local", cc: "smithers@plant.local"
     #  mail.remove :cc
-    def remove opt
-      keys = opt.keys
+    def remove keys
+      keys = keys.map(&:to_sym)
       @options.reject! {|k, v| keys.include?(k) }
     end
 
