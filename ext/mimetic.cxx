@@ -131,8 +131,10 @@ void rb_load_mime_types(VALUE self, VALUE filename) {
 }
 
 VALUE rb_mimetic_build(VALUE self, VALUE options) {
-    ostringstream output;
     VALUE attachment;
+    ostringstream output;
+    rb_encoding* enc = 0;
+
     VALUE text    = rb_hash_aref(options, SYM("text"));
     VALUE to      = rb_hash_aref(options, SYM("to"));
     VALUE from    = rb_hash_aref(options, SYM("from"));
@@ -195,12 +197,14 @@ VALUE rb_mimetic_build(VALUE self, VALUE options) {
             html_part->header().contentId(hcid == Qnil ? content_id() + ">" : ContentId(CSTRING(hcid)));
             html_part->header().mimeVersion(v1);
             html_part->body().assign(CSTRING(html));
+            enc = rb_enc_get(html);
         }
         else {
             message->body().assign(CSTRING(text));
             message->header().contentType("text/plain; charset=" + RUBY_ENCODING(text));
             message->header().contentTransferEncoding("8bit");
             message->header().mimeVersion(v1);
+            enc = rb_enc_get(text);
         }
 
         if (files != Qnil && RARRAY_LEN(files) > 0) {
@@ -240,7 +244,9 @@ VALUE rb_mimetic_build(VALUE self, VALUE options) {
 
         output << *message << endl;
         delete message;
-        return rb_str_new2(output.str().c_str());
+
+        string content = output.str();
+        return rb_enc_str_new(content.data(), content.size(), enc);
     }
     catch(exception &e) {
         if (message) delete message;
