@@ -8,6 +8,7 @@ $rootdir = Pathname.new(__FILE__).dirname
 $gemspec = Gem::Specification.new do |s|
   s.name          = 'pony-express'
   s.version       = '0.9.0'
+  s.date          = Date.today
   s.summary       = 'A fast and lightweight mailer'
   s.description   = 'A fast and lightweight mailer for ruby that uses libmimetic for generating mails'
   s.email         = 'deepfryed@gmail.com'
