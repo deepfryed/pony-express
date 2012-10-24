@@ -1,4 +1,4 @@
-require_relative '../helper'
+require 'helper'
 
 describe "Content-ID" do
   before do

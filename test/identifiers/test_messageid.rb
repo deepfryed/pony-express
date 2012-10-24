@@ -1,4 +1,4 @@
-require_relative '../helper'
+require 'helper'
 
 describe "Message-ID" do
   before do

@@ -1,6 +1,6 @@
 require 'etc'
 require 'digest/md5'
-require_relative 'helper'
+require 'helper'
 
 # TODO make these tests platform independent
 describe "Delivery" do
