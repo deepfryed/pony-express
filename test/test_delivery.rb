@@ -3,6 +3,7 @@ require 'digest/md5'
 require 'helper'
 
 # TODO make these tests platform independent
+# TODO add test for sendmail from field, including weird chars to test shell escaping
 describe "Delivery" do
   before do
     user   = '%s@localhost' % Etc.getlogin
