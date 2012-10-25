@@ -45,9 +45,18 @@ module PonyExpress
     via_options = options.delete(:via_options) || {}
     via         = via.to_sym
 
+    envelope_from = options[:from]
+    if headers = options[:headers]
+      if return_path = headers.find{|h| h[:name] == 'Return-Path' }
+        envelope_from = return_path[:value]
+      elsif sender = headers.find{|h| h[:name] == 'Sender' }
+        envelope_from = sender[:value]
+      end
+    end
+
     if TRANSPORTS.include? via
       case via
-        when :sendmail then transport_via_sendmail build(options), via_options
+        when :sendmail then transport_via_sendmail build(options), envelope_from, options[:to], via_options
         when :smtp     then transport_via_smtp build(options), options[:from], options[:to], via_options
       end
     else
@@ -63,8 +72,8 @@ module PonyExpress
     @@sendmail_binary
   end
 
-  def transport_via_sendmail content, options = {}
-    IO.popen([sendmail_binary, '-t'], 'w') {|io| io.write(content)}
+  def transport_via_sendmail content, from, to, options = {}
+    IO.popen([sendmail_binary, '-t', '-i', "-f #{escape_for_shell from}"], 'w') {|io| io.write(content)}
   end
 
   def transport_via_smtp content, from, to, options = {}
@@ -81,6 +90,12 @@ module PonyExpress
     end
     smtp.send_message content, from, to
     smtp.finish
+  end
+
+  # Blatantly stolen from mikel/mail
+  def escape_for_shell(str)
+    return "''" if str.to_s == ''
+    str.gsub(/([^A-Za-z0-9_\s\+\-.,:\/@\n])/n, "\\\\\\1").gsub(/\n/, "'\n'")
   end
 
   class Mail
@@ -119,6 +134,7 @@ module PonyExpress
     def dispatch
       mail(@options)
     end
+    def deliver; dispatch end
 
     # Return the encoded email content.
     #
