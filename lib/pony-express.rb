@@ -1,13 +1,13 @@
 require 'net/smtp'
-begin; require 'smtp_tls'; rescue LoadError; end
-require_relative '../ext/mimetic'
+require 'shellwords'
+require 'pony-express/mimetic'
 
 module PonyExpress
   TRANSPORTS           = [ :smtp, :sendmail ]
   DEFAULT_SMTP_OPTIONS = { host: 'localhost', port: '25', domain: 'localhost.localdomain' }
   @@sendmail_binary    = '/usr/sbin/sendmail'
 
-  Mimetic.load_mime_types File.dirname(__FILE__) + "/../mime.types"
+  Mimetic.load_mime_types File.join(File.dirname(__FILE__), '..', 'mime.types')
 
   def build options
     # TODO validation.
@@ -46,10 +46,11 @@ module PonyExpress
     via         = via.to_sym
 
     envelope_from = options[:from]
+
     if headers = options[:headers]
-      if return_path = headers.find{|h| h[:name] == 'Return-Path' }
+      if return_path = headers.find {|h| h[:name] == 'Return-Path'}
         envelope_from = return_path[:value]
-      elsif sender = headers.find{|h| h[:name] == 'Sender' }
+      elsif sender = headers.find {|h| h[:name] == 'Sender'}
         envelope_from = sender[:value]
       end
     end
@@ -73,14 +74,20 @@ module PonyExpress
   end
 
   def transport_via_sendmail content, from, to, options = {}
-    IO.popen([sendmail_binary, '-t', '-i', "-f #{escape_for_shell from}"], 'w') {|io| io.write(content)}
+    IO.popen([sendmail_binary, '-t', '-i', "-f #{Shellwords.escape(from)}"], 'w') {|io| io.write(content)}
   end
 
   def transport_via_smtp content, from, to, options = {}
     o = DEFAULT_SMTP_OPTIONS.merge(options)
     smtp = Net::SMTP.new(o[:host], o[:port])
     if o[:tls]
-      raise "You may need: gem install smtp_tls" unless smtp.respond_to?(:enable_starttls)
+      unless smtp.respond_to?(:enable_starttls)
+        begin
+          require 'smtp_tls'
+        rescue LoadError
+          raise "You may need: gem install smtp_tls"
+        end
+      end
       smtp.enable_starttls
     end
     if o.include?(:auth)
@@ -90,12 +97,6 @@ module PonyExpress
     end
     smtp.send_message content, from, to
     smtp.finish
-  end
-
-  # Blatantly stolen from mikel/mail
-  def escape_for_shell(str)
-    return "''" if str.to_s == ''
-    str.gsub(/([^A-Za-z0-9_\s\+\-.,:\/@\n])/n, "\\\\\\1").gsub(/\n/, "'\n'")
   end
 
   class Mail

@@ -20,7 +20,7 @@ $gemspec = Gem::Specification.new do |s|
   s.files         = FileList[
     'mime.types',
     'lib/**/*.rb',
-    'ext/*.{h,c,cxx}',
+    'ext/**/*.{h,c,cxx,rb}',
     'README.md',
   ]
 
@@ -35,7 +35,7 @@ end
 
 desc 'compile extension'
 task :compile do
-  Dir.chdir('ext') do
+  Dir.chdir('ext/pony-express') do
     system('ruby extconf.rb && make -j2') or raise 'unable to compile pony-express'
   end
 end
