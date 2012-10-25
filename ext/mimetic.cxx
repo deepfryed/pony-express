@@ -88,12 +88,13 @@ string safe_rfc2047(string v) {
     return v;
 }
 
-string quoted_printable(VALUE str) {
+string quoted_printable(VALUE str, int maxlen = 76) {
     VALUE ascii = rb_str_new2(CSTRING(str));
     FORCE_ENCODING(ascii, rb_ASCII);
     if (rb_str_cmp(ascii, str) != 0) {
         string raw = CSTRING(str);
         QP::Encoder qp;
+        qp.maxlen(maxlen);
         istringstream is(raw);
         ostringstream encoded;
         istreambuf_iterator<char> ibeg(is), iend;
@@ -221,7 +222,7 @@ VALUE rb_mimetic_build(VALUE self, VALUE options) {
 
         message->header().from(CSTRING(from));
         message->header().to(CSTRING(to));
-        message->header().subject(quoted_printable(subject));
+        message->header().subject(quoted_printable(subject, 65535));
         message->header().messageid(mid != Qnil ? CSTRING(mid) : message_id(1));
 
         if (replyto != Qnil) message->header().replyto(CSTRING(replyto));
