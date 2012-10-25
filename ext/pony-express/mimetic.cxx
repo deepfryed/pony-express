@@ -11,18 +11,13 @@ extern "C" {
 #include <mimetic/mimetic.h>
 #include <map>
 
-#define ID_CONST_GET rb_intern("const_get")
-#define CONST_GET(scope, constant) (rb_funcall(scope, ID_CONST_GET, 1, rb_str_new2(constant)))
 #define RUBY_ENCODING(str) string(rb_enc_get(str)->name)
-#define VALUEFUNC(f) ((VALUE (*)(ANYARGS)) f)
-#define FORCE_ENCODING(str,enc) rb_enc_associate(str, rb_to_encoding(enc)); ENC_CODERANGE_CLEAR(str);
-#define TO_S(v)                 rb_funcall(v, rb_intern("to_s"), 0)
-#define CSTRING(v)              RSTRING_PTR(TYPE(v) != T_STRING ? TO_S(v) : v)
-#define RBSTRING(v)             rb_str_new2(v.c_str())
-#define SYM(v)                  ID2SYM(rb_intern(v))
+#define TO_S(v)            rb_funcall(v, rb_intern("to_s"), 0)
+#define CSTRING(v)         RSTRING_PTR(TYPE(v) != T_STRING ? TO_S(v) : v)
+#define RUBYSTRING(v)      rb_str_new2(v.c_str())
+#define SYM(v)             ID2SYM(rb_intern(v))
 
 static VALUE rb_mMimetic;
-static VALUE rb_UTF8, rb_ASCII;
 
 using namespace std;
 using namespace mimetic;
@@ -90,7 +85,8 @@ string safe_rfc2047(string v) {
 
 string quoted_printable(VALUE str, int maxlen = 76) {
     VALUE ascii = rb_str_new2(CSTRING(str));
-    FORCE_ENCODING(ascii, rb_ASCII);
+    rb_enc_associate(ascii, rb_usascii_encoding());
+    ENC_CODERANGE_CLEAR(ascii);
     if (rb_str_cmp(ascii, str) != 0) {
         string raw = CSTRING(str);
         QP::Encoder qp;
@@ -234,8 +230,8 @@ VALUE rb_mimetic_build(VALUE self, VALUE options) {
                 VALUE header = rb_ary_entry(headers, i);
                 if (TYPE(header) != T_HASH)
                     throw "Mimetic.build header should be a hash with :name and :value";
-                string name  = CSTRING(rb_hash_aref(header, ID2SYM(rb_intern("name"))));
-                string value = CSTRING(rb_hash_aref(header, ID2SYM(rb_intern("value"))));
+                string name  = CSTRING(rb_hash_aref(header, SYM("name")));
+                string value = CSTRING(rb_hash_aref(header, SYM("value")));
                 if (name.length() && value.length()) {
                     Field f(name, value);
                     message->header().field("") = f;
@@ -272,14 +268,14 @@ VALUE parse_mime_parts(MimeEntity &me) {
         VALUE content = rb_hash_new();
         MimeEntity *part = *curr;
 
-        rb_hash_aset(content, SYM("type"), RBSTRING(part->header().contentType().str()));
+        rb_hash_aset(content, SYM("type"), RUBYSTRING(part->header().contentType().str()));
         if (part->header().contentType().isMultipart()) {
             rb_hash_aset(content, SYM("content"), parse_mime_parts(*part));
         }
         else {
-            rb_hash_aset(content, SYM("content"),      RBSTRING(part->body()));
-            rb_hash_aset(content, SYM("encoding"),     RBSTRING(part->header().contentTransferEncoding().str()));
-            rb_hash_aset(content, SYM("disposition"),  RBSTRING(part->header().contentDisposition().str()));
+            rb_hash_aset(content, SYM("content"),      RUBYSTRING(part->body()));
+            rb_hash_aset(content, SYM("encoding"),     RUBYSTRING(part->header().contentTransferEncoding().str()));
+            rb_hash_aset(content, SYM("disposition"),  RUBYSTRING(part->header().contentDisposition().str()));
         }
         rb_ary_push(contents, content);
         curr++;
@@ -301,12 +297,12 @@ VALUE rb_mimetic_parse(VALUE self, VALUE data) {
 
         VALUE message = rb_hash_new();
 
-        rb_hash_aset(message, SYM("from"),    RBSTRING(me.header().from().str()));
-        rb_hash_aset(message, SYM("to"),      RBSTRING(me.header().to().str()));
-        rb_hash_aset(message, SYM("subject"), RBSTRING(me.header().subject()));
-        rb_hash_aset(message, SYM("cc"),      RBSTRING(me.header().cc().str()));
-        rb_hash_aset(message, SYM("bcc"),     RBSTRING(me.header().bcc().str()));
-        rb_hash_aset(message, SYM("replyto"), RBSTRING(me.header().replyto().str()));
+        rb_hash_aset(message, SYM("from"),    RUBYSTRING(me.header().from().str()));
+        rb_hash_aset(message, SYM("to"),      RUBYSTRING(me.header().to().str()));
+        rb_hash_aset(message, SYM("subject"), RUBYSTRING(me.header().subject()));
+        rb_hash_aset(message, SYM("cc"),      RUBYSTRING(me.header().cc().str()));
+        rb_hash_aset(message, SYM("bcc"),     RUBYSTRING(me.header().bcc().str()));
+        rb_hash_aset(message, SYM("replyto"), RUBYSTRING(me.header().replyto().str()));
 
         rb_hash_aset(message, SYM("contents"), parse_mime_parts(me));
         return message;
@@ -324,13 +320,8 @@ VALUE rb_mimetic_parse(VALUE self, VALUE data) {
 extern "C"  {
     void Init_mimetic(void) {
         rb_mMimetic = rb_define_module("Mimetic");
-        rb_define_module_function(rb_mMimetic, "build", VALUEFUNC(rb_mimetic_build), 1);
-        rb_define_module_function(rb_mMimetic, "parse", VALUEFUNC(rb_mimetic_parse), 1);
-        rb_define_module_function(rb_mMimetic, "load_mime_types", VALUEFUNC(rb_load_mime_types), 1);
-        rb_UTF8  = rb_str_new2("UTF-8");
-        rb_ASCII = rb_str_new2("US-ASCII");
-
-        rb_global_variable(&rb_UTF8);
-        rb_global_variable(&rb_ASCII);
+        rb_define_module_function(rb_mMimetic, "build",           RUBY_METHOD_FUNC(rb_mimetic_build),   1);
+        rb_define_module_function(rb_mMimetic, "parse",           RUBY_METHOD_FUNC(rb_mimetic_parse),   1);
+        rb_define_module_function(rb_mMimetic, "load_mime_types", RUBY_METHOD_FUNC(rb_load_mime_types), 1);
     }
 }
