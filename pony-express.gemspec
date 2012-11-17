@@ -2,11 +2,11 @@
 
 Gem::Specification.new do |s|
   s.name = "pony-express"
-  s.version = "0.9.1"
+  s.version = "0.9.2"
 
   s.required_rubygems_version = Gem::Requirement.new(">= 0") if s.respond_to? :required_rubygems_version=
   s.authors = ["Bharanee Rathna"]
-  s.date = "2012-10-25"
+  s.date = "2012-11-18"
   s.description = "A fast and lightweight mailer for ruby that uses libmimetic for generating mails"
   s.email = "deepfryed@gmail.com"
   s.extensions = ["ext/pony-express/extconf.rb"]
