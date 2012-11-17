@@ -47,17 +47,6 @@ Don't want to create new mail objects ? Just pass in all options to PonyExpress.
   assert_equal 1, PonyExpress::Test.mailbox.length
 ```
 
-## TODO
-
-* Build a rainbow machine and rope in some unicorns.
-
-## Won't Do
-
-* Support for Ruby 1.8 or Rubinius or JRuby
-* MIME parsing. If you need a full blown mail library have a look at the mail gem.
-
 ## License
 
-GNU GPLv3, so its free and comes with no guarantees. If it brings down your website or burns down your house, I will
-not be held responsible. Use it at your own risk. You can read all about GNU here: http://www.gnu.org and
-GNU GPLv3 here: http://www.gnu.org/licenses/gpl.txt.
+GPLv3

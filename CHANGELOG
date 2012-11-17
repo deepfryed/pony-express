@@ -1,0 +1,4 @@
+=== 0.9.2 (2012-11-18)
+
+* quoted printable subject fixes.
+* 'envelope from' fixes for sendmail to work.

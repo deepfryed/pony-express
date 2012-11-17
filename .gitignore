@@ -8,3 +8,4 @@ ext/*
 !ext/*.cxx
 !ext/*.h
 ext/*.so
+*.gem
