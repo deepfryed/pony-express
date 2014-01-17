@@ -4,10 +4,10 @@ require 'mkmf'
 
 $CFLAGS = "-DHAVE_INTTYPES_H"
 
-Config::CONFIG['CC']  = 'g++'
-Config::CONFIG['CPP'] = 'g++'
+RbConfig::CONFIG['CC']  = 'g++'
+RbConfig::CONFIG['CPP'] = 'g++'
 
-if !have_library('mimetic')
+if !have_library('mimetic', 'memset')
   puts <<-ERROR
 
     Cannot find mimetic headers or libraries.
@@ -17,7 +17,7 @@ if !have_library('mimetic')
   exit 1
 end
 
-if !have_library('pcrecpp')
+if !have_library('pcrecpp', 'memset')
   puts <<-ERROR
 
     Cannot find pcrecpp headers or libraries from pcre3.
